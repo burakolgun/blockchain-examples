@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<script src="https://unpkg.com/vue@3"></script>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<head>
+    <meta charset="UTF-8">
+    <title>Hello from wallet app</title>
+</head>
+<body>
+<div id="app">
+    <h5>Private Key is: </h5>
+    <p>{% wallet?.data.privateKey %}</p>
+    <h5>Public Key is: </h5>
+    <p>{% wallet?.data.publicKey %}</p>
+    <h5>Wallet Address is: </h5>
+    <p>{% wallet?.data.blockchainAddress %}</p>
+    <h5>Wallet Balance is: </h5>
+    <p>{% walletBalance %}</p>
+
+    <div>
+        <h4> transfer </h4>
+        <label>
+            <input v-model="recipientAddress" placeholder="recipientAddress">
+        </label>
+        <label>
+            <input v-model="amount" placeholder="amount" type="number" step=20>
+        </label>
+        <label>
+            <button v-on:click="sendTransaction">Send</button>
+        </label>
+    </div>
+</div>
+<div id="sec"></div>
+
+</body>
+<script>
+    Vue.createApp({
+        delimiters: ['{%', '%}'],
+        data() {
+            return {
+                wallet: null,
+                address: null,
+                privateKey: null,
+                publicKey: null,
+                recipientAddress: null,
+                amount: null,
+                transaction: null,
+                walletBalance: 0
+            }
+        },
+        methods: {
+            sendTransaction: function (event) {
+                // `this` inside methods points to the Vue instance
+                if(this.recipientAddress && this.amount) {
+                    console.log(this.recipientAddress)
+                    console.log(this.amount)
+                    alert("Transaction sent.")
+                    axios
+                        .post('http://localhost:5000/send-transaction', {
+                            senderPrivateKey: this.wallet?.data.privateKey,
+                            senderPublicKey: this.wallet?.data.publicKey,
+                            senderBlockchainAddress: this.wallet?.data.blockchainAddress,
+                            recipientBlockchainAddress: this.recipientAddress,
+                            value: this.amount
+                        })
+                        .then(response => (this.transaction = response))
+                    return;
+                }
+
+                alert("Missing field.")
+            },
+            getWalletBalance: function () {
+                setInterval(() => {
+                    if(this.wallet?.data.blockchainAddress) {
+                        axios
+                            .get("http://localhost:5000/balance/" + this.wallet?.data.blockchainAddress)
+                            .then(response => this.walletBalance = response.data.balance)
+                    }
+                }, 1000)
+            }
+        },
+        mounted() {
+            this.getWalletBalance()
+            axios
+                .get('http://localhost:5001/random-wallet')
+                .then(response => (this.wallet = response))
+        }
+    }).mount('#app')
+
+
+</script>
+</html>
