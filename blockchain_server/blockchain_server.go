@@ -40,16 +40,16 @@ func init() {
 	t2 := wallet.NewTransaction(walletUserB.PrivateKey(), walletUserB.PublicKey(), walletUserB.BlockchainAddress(), walletUserA.BlockchainAddress(), 100)
 
 	chain.BlockList = append(chain.BlockList, block.CreateGenesisBlock([]*transaction.Transaction{transaction.New("genesis", minerWallet.BlockchainAddress(), 3000)}))
-	chain.Mining("00000")
+	chain.Mining()
 
 	isOk := chain.AddTransaction(minerWallet.BlockchainAddress(), walletUserB.BlockchainAddress(), 1000, minerWallet.PublicKey(), t.GenerateSignature())
 	fmt.Printf("is ok, %v \n", isOk)
-	chain.Mining("00000")
+	chain.Mining()
 
 	isOk = chain.AddTransaction(walletUserB.BlockchainAddress(), walletUserA.BlockchainAddress(), 100, walletUserB.PublicKey(), t2.GenerateSignature())
 	fmt.Printf("is ok, %v \n", isOk)
 
-	chain.Mining("00000")
+	chain.Mining()
 	fmt.Printf("A %.1f\n", chain.CalculateTotalAmount(walletUserA.BlockchainAddress()))
 	fmt.Printf("B %.1f\n", chain.CalculateTotalAmount(walletUserB.BlockchainAddress()))
 	fmt.Printf("M %.1f\n", chain.CalculateTotalAmount(minerWallet.BlockchainAddress()))

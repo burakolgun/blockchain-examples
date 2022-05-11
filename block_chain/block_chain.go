@@ -10,6 +10,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -18,12 +19,13 @@ import (
 const BlockChainCore = "BLOCKCHAIN_CORE"
 const MiningReward = 0.1
 const MinerAddress = "MINER_ADDRESS"
-const ExpectedMiningProcessIntervalSecond = 20
+const ExpectedMiningProcessIntervalMillisecond = 2000
+const DifficultyAdjustmentIntervalBlockCount = 20
 
 type BlockChain struct {
 	BlockList       []*block.Block
 	TransactionPool []*transaction.Transaction
-	Difficulty      string
+	Difficulty      int
 	lock            sync.Mutex
 }
 
@@ -55,13 +57,15 @@ func (c *BlockChain) GetTransactionPool() []*transaction.Transaction {
 	return c.TransactionPool
 }
 
-func (c *BlockChain) Mining(difficulty string) {
+func (c *BlockChain) Mining() {
 	c.lock.Lock()
+	difficulty := c.GetDifficulty()
+	fmt.Println("difficulty " + "----<> " + strings.Repeat("0", difficulty))
 	defer c.lock.Unlock()
 
 	fmt.Println("mining start")
 
-	now := time.Now().String()
+	now := time.Now().UnixMilli()
 	nonce := int64(0)
 	prevBlock := c.BlockList[len(c.BlockList)-1]
 
@@ -69,7 +73,7 @@ func (c *BlockChain) Mining(difficulty string) {
 	c.AddTransaction(BlockChainCore, MinerAddress, MiningReward, nil, nil)
 
 	for {
-		if strings.HasPrefix(h, difficulty) {
+		if strings.HasPrefix(h, strings.Repeat("0", difficulty)) {
 			fmt.Println(fmt.Sprintf("found, %s", h))
 			break
 		}
@@ -94,8 +98,42 @@ func (c *BlockChain) Mining(difficulty string) {
 }
 
 func (c *BlockChain) RecursiveMiner() {
-	c.Mining("0000")
-	time.AfterFunc(time.Second*ExpectedMiningProcessIntervalSecond, c.RecursiveMiner)
+	c.Mining()
+	c.RecursiveMiner()
+}
+
+func (c *BlockChain) GetDifficulty() int {
+	if c.BlockList[len(c.BlockList)-1].Index%DifficultyAdjustmentIntervalBlockCount == 0 && c.BlockList[len(c.BlockList)-1].Index != 0 {
+		fmt.Printf("%s difficulty adjustment started\n", strings.Repeat("=", 25))
+
+		return c.AdjustDifficulty()
+	}
+
+	fmt.Printf("%s difficulty adjustment conditions did not occur yet \n", strings.Repeat("=", 25))
+	return c.BlockList[len(c.BlockList)-1].Difficulty
+}
+
+func (c *BlockChain) AdjustDifficulty() int {
+	var expectedProcessTime int64
+	prevAdjustmentBlock := c.BlockList[(len(c.BlockList))-DifficultyAdjustmentIntervalBlockCount]
+	expectedProcessTime = DifficultyAdjustmentIntervalBlockCount * ExpectedMiningProcessIntervalMillisecond
+	timeTaken := c.BlockList[len(c.BlockList)-1].TimeStamp - prevAdjustmentBlock.TimeStamp
+
+	fmt.Println("prevAdjustmentBlock" + "----<> " + strconv.FormatInt(prevAdjustmentBlock.Index, 10))
+	fmt.Println("prevAdjustmentBlock - Difficulty " + "----<>" + strconv.FormatInt(int64(prevAdjustmentBlock.Difficulty), 10))
+	fmt.Println("lastBLock" + "----<> " + strconv.FormatInt(c.BlockList[len(c.BlockList)-1].Index, 10))
+	fmt.Println("time taken" + "----<> " + strconv.FormatInt(timeTaken, 10))
+
+	if timeTaken < expectedProcessTime/2 {
+		fmt.Printf("%s difficulty adjusted as %d \n", strings.Repeat("=", 25), prevAdjustmentBlock.Difficulty+1)
+		return prevAdjustmentBlock.Difficulty + 1
+	} else if timeTaken > expectedProcessTime*2 {
+		fmt.Printf("%s difficulty adjusted as %d \n", strings.Repeat("=", 25), prevAdjustmentBlock.Difficulty-1)
+		return prevAdjustmentBlock.Difficulty - 1
+	}
+
+	fmt.Printf("%s difficulty adjustment no necessary \n", strings.Repeat("=", 25))
+	return prevAdjustmentBlock.Difficulty
 }
 
 func (c *BlockChain) CreateTransaction(sender string, recipient string, value float32, senderPublicKey *ecdsa.PublicKey, signature *utils.Signature) bool {
@@ -123,8 +161,8 @@ func (c *BlockChain) AddTransaction(sender string, recipient string, value float
 	return false
 }
 
-func (c *BlockChain) CalculateHash(index int64, timeStamp string, prevHash string, data []*transaction.Transaction, nonce int64, diff string) string {
-	return hash.CalculateHash(fmt.Sprintf("%d-%s-%s-%s-%d-%s", index, timeStamp, prevHash, data, nonce, diff))
+func (c *BlockChain) CalculateHash(index int64, timeStamp int64, prevHash string, data []*transaction.Transaction, nonce int64, diff int) string {
+	return hash.CalculateHash(fmt.Sprintf("%d-%s-%s-%s-%d-%s", index, timeStamp, prevHash, data, nonce, strings.Repeat("0", diff)))
 }
 
 func (c *BlockChain) VerifyTransactionSignature(senderPublicKey *ecdsa.PublicKey, signature *utils.Signature, transaction *transaction.Transaction) bool {
